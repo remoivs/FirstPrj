@@ -2,44 +2,38 @@ pipeline {
     agent none
     stages {
         
-        stage('install puppet on slave') {
+        stage('Install and configure puppet agent on the slave node') {
             agent { label 'slave'}
             steps {
                 echo 'Install Puppet'
-                sh "wget -N -O 'puppet.deb' https://apt.puppetlabs.com/puppet6-release-bionic.deb"
-                sh "chmod 755 puppet.deb"
-                sh "sudo dpkg -i puppet.deb"
-                sh "sudo apt update"
-                sh "sudo apt install -y puppet-agent"
+                sh "wget https://apt.puppetlabs.com/puppetlabs-release-pc1-xenial.deb"
+                sh "sudo dpkg -i puppetlabs-release-pc1-xenial.deb"
+                sh "sudo apt-get update"
+                sh "sudo apt-get install puppet-agent"
             }
         }
 
-        stage('configure and start puppet') {
+        stage('Start puppet') {
             agent { label 'slave'}
             steps {
-                echo 'configure puppet'
-                sh "mkdir -p /etc/puppetlabs/puppet"
-                sh "if [ -f /etc/puppetlabs/puppet/puppet.conf ]; then sudo rm -f /etc/puppetlabs/puppet.conf; fi"
-                sh "echo '[main]\ncertname = node1.local\nserver = puppet' >> ~/puppet.conf"
-                sh "sudo mv ~/puppet.conf /etc/puppetlabs/puppet/puppet.conf"
                 echo 'start puppet'
                 sh "sudo systemctl start puppet"
                 sh "sudo systemctl enable puppet"
             }
         }
 
-        stage('Install Docker on slave through puppet') {
+        stage('Trigger the puppet agent on test server to install docker') {
             agent{ label 'slave'}
             steps {
                 sh "sudo /opt/puppetlabs/bin/puppet module install garethr-docker"
-                sh "sudo /opt/puppetlabs/bin/puppet apply /home/jenkins/jenkins_slave/workspace/Certification/dockerce.pp"
             }
         }
 
-        stage('Git Checkout') {
+        stage('Pull files from Git-checkout') {
             agent{ label 'slave'}
             steps {
-                sh "if [ ! -d '/home/jenkins/jenkins_slave/workspace/Certification' ]; then git clone https://github.com/remoivs/FirstPrj.git /home/jenkins/jenkins_slave/workspace/Certification ; fi"
+                sh "git clone https://github.com/remoivs/FirstPrj.git /home/jenkins/jenkins_slave/workspace/Certification "
+                sh "sudo /opt/puppetlabs/bin/puppet apply /home/jenkins/jenkins_slave/workspace/Certification/dockerce.pp"
                 sh "cd /home/jenkins/jenkins_slave/workspace/Certification && sudo git checkout master"
             }
         }
